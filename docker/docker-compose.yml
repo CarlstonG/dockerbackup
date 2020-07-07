@@ -1,0 +1,115 @@
+# docker-compose 1.25.5 version
+# https://www.digitalocean.com/community/tutorials/how-to-install-docker-compose-on-ubuntu-18-04-ru
+# sudo curl -L https://github.com/docker/compose/releases/download/1.25.5/docker-compose-`uname -s`-`uname -m` -o /usr/bin/docker-compose
+version: '3.7'
+
+services:
+
+  gw-common:
+    container_name: gw-common
+    image: gigwire-common:latest
+    build:
+      context: './common'
+      dockerfile: './Dockerfile'
+
+  gw-nginx:
+    container_name: gw-nginx
+    build:
+      context: './nginx'
+      dockerfile: './Dockerfile'
+    ports:
+      - 80:80
+      - 443:443
+    environment:
+      - GW_HOST_FRONTEND
+      - ENV
+      - WITH_AUTH
+      - WITH_SSL
+      - FRONT_MODE
+    volumes:
+      - "../../backend:/var/www/backend"
+      - "./nginx/conf:/tmp/nginx"
+      - frontend-build-volume:/var/www/frontend_build
+      - "./nginx/bs/:/var/www/bs"
+    command: /bin/sh -c "chmod 777 /var/www/bs/init.sh && /var/www/bs/init.sh"
+    restart: always
+
+  gw-backend:
+    container_name: gw-backend
+    build:
+      context: './backend'
+      dockerfile: './Dockerfile'
+    tty: true
+    volumes:
+      - "../../backend:/var/www/backend"
+      - "./backend/bs:/var/www/bs"
+      - "./backend/conf:/tmp/conf"
+    environment:
+      - WITH_INSTALL
+    working_dir: /var/www/backend
+    command: /bin/bash -c "chmod 777 /var/www/bs/init.sh && /var/www/bs/init.sh"
+    restart: always
+
+  gw-worker:
+    container_name: gw-worker
+    build:
+      context: './backend'
+      dockerfile: './Dockerfile'
+    tty: true
+    volumes:
+      - "../../backend:/var/www/backend"
+      - "./backend/bs-worker:/var/www/bs"
+    environment:
+      - WITH_INSTALL
+    working_dir: /var/www/backend
+    command: /bin/bash -c "chmod 777 /var/www/bs/init.sh && /var/www/bs/init.sh"
+    restart: always
+
+  gw-scheduler:
+    container_name: gw-scheduler
+    build:
+      context: './backend'
+      dockerfile: './Dockerfile'
+    tty: true
+    volumes:
+      - "../../backend:/var/www/backend"
+      - "./backend/bs-scheduler:/var/www/bs"
+    environment:
+      - WITH_INSTALL
+    working_dir: /var/www/backend
+    command: /bin/bash -c "chmod 777 /var/www/bs/init.sh && /var/www/bs/init.sh"
+    restart: always
+
+  gw-frontend:
+    container_name: gw-frontend
+    build:
+      context: './frontend'
+      dockerfile: './Dockerfile'
+    volumes:
+      - "../../frontend:/var/www/frontend"
+      - "./frontend/bs:/var/www/bs"
+      - frontend-build-volume:/var/www/frontend_build
+    environment:
+      - WITH_INSTALL
+      - GMAPS_API_KEY
+      - ENV
+      - FRONT_MODE
+    working_dir: /var/www/frontend
+    command: /bin/bash -c "chmod 777 /var/www/bs/init.sh && /var/www/bs/init.sh"
+
+  gw-postgres:
+    container_name: gw-postgres
+    image: 'postgres:11.4'
+    ports:
+      - '5437:5432'
+    volumes:
+      - postgres-volume:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=123
+      - POSTGRES_DB=gigwire
+    restart: 'always'
+volumes:
+  frontend-build-volume:
+  postgres-volume:
+
